@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Code Editor | Real-time Preview</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .editor-container {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            padding: 10px;
+            background-color: #252526;
+        }
+
+        .editor-section {
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #3e3e42;
+            border-radius: 8px;
+            background-color: #1e1e1e;
+        }
+
+        .editor-header {
+            padding: 8px 12px;
+            background-color: #2d2d2d;
+            border-bottom: 1px solid #3e3e42;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+        }
+
+        .editor-title {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        textarea {
+            flex: 1;
+            background: transparent;
+            color: #9cdcfe;
+            padding: 15px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            border: none;
+            outline: none;
+            resize: none;
+            line-height: 1.5;
+        }
+
+        #preview-container {
+            flex: 1;
+            background-color: white;
+            border-top: 4px solid #3e3e42;
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .html-label { color: #e34c26; }
+        .css-label { color: #264de4; }
+        .js-label { color: #f7df1e; }
+
+        .resizer {
+            height: 8px;
+            background: #2d2d2d;
+            cursor: row-resize;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .resizer:hover { background: #3e3e42; }
+    </style>
+</head>
+<body>
+
+    <!-- Sarlavha paneli -->
+    <header class="p-3 bg-[#333333] border-bottom border-[#3e3e42] flex justify-between items-center">
+        <div class="flex items-center gap-3">
+            <i class="fas fa-code text-blue-400 text-xl"></i>
+            <h1 class="font-bold text-sm tracking-widest uppercase">Web Editor <span class="text-blue-500">PRO</span></h1>
+        </div>
+        <div class="flex gap-4">
+            <button onclick="resetEditors()" class="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded transition flex items-center gap-2">
+                <i class="fas fa-undo"></i> Tozalash
+            </button>
+            <button onclick="copyFullCode()" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded transition flex items-center gap-2">
+                <i class="fas fa-copy"></i> Nusxa olish
+            </button>
+        </div>
+    </header>
+
+    <!-- Muharrirlar bo'limi -->
+    <div class="editor-container" id="editor-grid">
+        <!-- HTML -->
+        <div class="editor-section">
+            <div class="editor-header">
+                <span class="editor-title html-label"><i class="fab fa-html5"></i> HTML</span>
+            </div>
+            <textarea id="html-code" spellcheck="false" placeholder="HTML kodini kiriting..."></textarea>
+        </div>
+
+        <!-- CSS -->
+        <div class="editor-section">
+            <div class="editor-header">
+                <span class="editor-title css-label"><i class="fab fa-css3-alt"></i> CSS</span>
+            </div>
+            <textarea id="css-code" spellcheck="false" placeholder="CSS kodini kiriting..."></textarea>
+        </div>
+
+        <!-- JavaScript -->
+        <div class="editor-section">
+            <div class="editor-header">
+                <span class="editor-title js-label"><i class="fab fa-js"></i> JavaScript</span>
+            </div>
+            <textarea id="js-code" spellcheck="false" placeholder="JS kodini kiriting..."></textarea>
+        </div>
+    </div>
+
+    <!-- O'lchamni o'zgartiruvchi -->
+    <div class="resizer">
+        <div class="w-10 h-1 bg-[#555] rounded-full"></div>
+    </div>
+
+    <!-- Preview bo'limi -->
+    <div id="preview-container">
+        <iframe id="preview-window"></iframe>
+    </div>
+
+    <script>
+        const htmlEditor = document.getElementById('html-code');
+        const cssEditor = document.getElementById('css-code');
+        const jsEditor = document.getElementById('js-code');
+        const previewWindow = document.getElementById('preview-window').contentWindow.document;
+
+        // Boshlang'ich namunalar
+        const defaultHTML = `
+<div class="card">
+  <h1>Salom Dunyo!</h1>
+  <p>Ushbu muharrirda HTML, CSS va JS kodlarini yozib ko'rishingiz mumkin.</p>
+  <button id="btn">Meni bos!</button>
+</div>
+        `;
+
+        const defaultCSS = `
+body {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  margin: 0;
+  font-family: sans-serif;
+}
+.card {
+  background: white;
+  padding: 30px;
+  border-radius: 15px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  text-align: center;
+}
+h1 { color: #333; }
+button {
+  background: #764ba2;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+button:hover { background: #667eea; }
+        `;
+
+        const defaultJS = `
+document.getElementById('btn').addEventListener('click', () => {
+  alert('Tabriklaymiz! Kod muvaffaqiyatli ishladi.');
+  document.body.style.background = '#222';
+});
+        `;
+
+        function updatePreview() {
+            const html = htmlEditor.value;
+            const css = `<style>${cssEditor.value}</style>`;
+            const js = `<script>${jsEditor.value}<\/script>`;
+
+            previewWindow.open();
+            previewWindow.write(html + css + js);
+            previewWindow.close();
+        }
+
+        // Hodisalarni tinglash
+        [htmlEditor, cssEditor, jsEditor].forEach(editor => {
+            editor.addEventListener('input', updatePreview);
+        });
+
+        function resetEditors() {
+            if(confirm("Barcha kodlarni o'chirib yubormoqchimisiz?")) {
+                htmlEditor.value = '';
+                cssEditor.value = '';
+                jsEditor.value = '';
+                updatePreview();
+            }
+        }
+
+        function copyFullCode() {
+            const fullContent = `
+<!-- HTML -->
+${htmlEditor.value}
+
+<!-- CSS -->
+<style>
+${cssEditor.value}
+</style>
+
+<!-- JS -->
+<script>
+${jsEditor.value}
+<\/script>
+            `;
+            const el = document.createElement('textarea');
+            el.value = fullContent;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+            alert("Barcha kodlar nusxalandi!");
+        }
+
+        // Dastlabki yuklash
+        window.onload = () => {
+            htmlEditor.value = defaultHTML.trim();
+            cssEditor.value = defaultCSS.trim();
+            jsEditor.value = defaultJS.trim();
+            updatePreview();
+        };
+    </script>
+</body>
+</html>
